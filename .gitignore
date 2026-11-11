@@ -1,0 +1,19 @@
+# Local configuration (contains your folders)
+overlay_mixer.ini
+
+# Runtime files
+overlay_mixer.pid
+overlay_mixer.lock
+logs/
+*.log
+
+# Default working folders (used without overlay_mixer.ini)
+/input/
+/atmo/
+/output/
+/error/
+/archive/
+
+# Python
+__pycache__/
+*.pyc
