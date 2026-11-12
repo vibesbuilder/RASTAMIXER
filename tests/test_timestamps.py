@@ -31,13 +31,13 @@ class SetOutputDatesTest(MixerTestCase):
             actual_ts, expected.timestamp(), delta=0.001,
             msg=f"{what}: {datetime.fromtimestamp(actual_ts)} instead of {expected}")
 
-    def test_last_modified_bekommt_datum_aus_dem_namen_und_behaelt_uhrzeit(self):
+    def test_last_modified_gets_date_from_name_and_keeps_time(self):
         event = date.today() + timedelta(days=20)
         before, after, log = self.apply(event)
         self.assertDateKeepsTime(after.st_mtime, before.st_mtime, event, "Last Modified")
         self.assertIn(f"Last Modified set: VAH Test.mp3 -> {event:%d.%m.%Y}", log)
 
-    def test_created_regel(self):
+    def test_created_rule(self):
         today = date.today()
         tomorrow = today + timedelta(days=1)
         # Days from today to the event -> expected Created date, rule in the log
@@ -55,14 +55,14 @@ class SetOutputDatesTest(MixerTestCase):
             (60, today + timedelta(days=46), "standard"),
         ]
         for offset, expected_created, rule in cases:
-            with self.subTest(tage=offset):
+            with self.subTest(days=offset):
                 event = today + timedelta(days=offset)
                 before, after, log = self.apply(event, name=f"VAH Test {offset}.mp3")
                 self.assertDateKeepsTime(created_ts(after), created_ts(before), expected_created, "Created")
                 self.assertDateKeepsTime(after.st_mtime, before.st_mtime, event, "Last Modified")
                 self.assertIn(f"Created rule {rule}", log)
 
-    def test_grenzfall_genau_14_tage_ergibt_created_heute(self):
+    def test_edge_case_exactly_14_days_gives_created_today(self):
         """
         Current behavior (v1.4.0): day_diff == 14 falls into the "14 days before
         Last Modified" branch and therefore yields TODAY instead of TOMORROW. A downstream
@@ -74,14 +74,14 @@ class SetOutputDatesTest(MixerTestCase):
         self.assertDateKeepsTime(created_ts(after), created_ts(before), today, "Created")
         self.assertIn("are 14 days apart. Using 14 days before Last Modified", log)
 
-    def test_set_windows_creation_time_setzt_datum_und_uhrzeit(self):
+    def test_set_windows_creation_time_sets_date_and_time(self):
         path = self.fertig / "VAH Test.mp3"
         path.write_bytes(b"x")
         target = datetime(2026, 5, 4, 13, 52, 7, 250000)
         self.mixer.set_windows_creation_time(path, target)
         self.assertAlmostEqual(created_ts(path.stat()), target.timestamp(), delta=0.001)
 
-    def test_set_windows_creation_time_meldet_die_echte_ursache(self):
+    def test_set_windows_creation_time_reports_the_real_cause(self):
         """Up to v1.4.0, missing ctypes prototypes always caused "The handle is invalid" (error 6)."""
         with self.assertRaises(OSError) as ctx:
             self.mixer.set_windows_creation_time(self.fertig / "fehlt.mp3", datetime.now())

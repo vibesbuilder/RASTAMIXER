@@ -20,8 +20,8 @@ from helpers import (SCRIPT_PATH, MixerTestCase, make_tone, requires_ffmpeg, sta
 LOG_LINE = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[INFO\] "
 
 
-class ImportOhneNebenwirkungenTest(unittest.TestCase):
-    def test_import_legt_keine_ordner_an_und_oeffnet_kein_log(self):
+class ImportWithoutSideEffectsTest(unittest.TestCase):
+    def test_import_creates_no_folders_and_opens_no_log(self):
         """Previously even the import failed if the network drive was not connected yet."""
         code = (
             "import importlib.util, json, logging, pathlib, sys\n"
@@ -53,7 +53,7 @@ class LoggingTest(MixerTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def test_schreibt_lokal_auf_nas_und_in_die_konsole(self):
+    def test_writes_local_log_nas_log_and_console(self):
         self.mixer.setup_logging()
         self.mixer.logger.info("test entry äöü")
         for text in (self.mixer.LOCAL_LOG_FILE.read_text(encoding="utf-8"),
@@ -61,7 +61,7 @@ class LoggingTest(MixerTestCase):
                      self.console.getvalue()):
             self.assertRegex(text, LOG_LINE + "test entry äöü")
 
-    def test_nas_log_ist_nach_jedem_eintrag_geschlossen(self):
+    def test_nas_log_is_closed_after_every_entry(self):
         self.mixer.setup_logging()
         self.mixer.logger.info("eins")
         nas = [h for h in self.mixer.logger.handlers if isinstance(h, self.mixer.ShortLivedFileHandler)]
@@ -73,7 +73,7 @@ class LoggingTest(MixerTestCase):
         self.mixer.logger.info("zwei")
         self.assertIn("zwei", self.mixer.LOG_FILE.read_text(encoding="utf-8"))
 
-    def test_nas_nicht_erreichbar_bricht_nichts_ab(self):
+    def test_unreachable_nas_breaks_nothing(self):
         unreachable = self.root / "fehlt" / "overlay_mixer.log"
         stderr = io.StringIO()
         with mock.patch.object(self.mixer, "LOG_FILE", unreachable), mock.patch("sys.stderr", stderr):
@@ -83,7 +83,7 @@ class LoggingTest(MixerTestCase):
         self.assertIn("Eintrag 2", self.mixer.LOCAL_LOG_FILE.read_text(encoding="utf-8"))
         self.assertEqual(stderr.getvalue().count("not writable"), 1, stderr.getvalue())
 
-    def test_nas_log_rotiert(self):
+    def test_nas_log_rotates(self):
         path = self.root / "rotation.log"
         handler = self.mixer.ShortLivedFileHandler(path, maxBytes=200, backupCount=2, encoding="utf-8")
         handler.setFormatter(self.mixer.fmt)
@@ -98,7 +98,7 @@ class LoggingTest(MixerTestCase):
 
 
 class ThreadExcepthookTest(MixerTestCase):
-    def test_unbehandelte_thread_fehler_landen_im_log(self):
+    def test_unhandled_thread_errors_end_up_in_the_log(self):
         saved = threading.excepthook
         self.addCleanup(setattr, threading, "excepthook", saved)
         self.mixer.install_thread_excepthook()
@@ -131,29 +131,29 @@ class QuickEditTest(MixerTestCase):
             return 1
 
     @unittest.skipUnless(os.name == "nt", "Windows only")
-    def test_quickedit_wird_abgeschaltet(self):
+    def test_quickedit_is_disabled(self):
         fake = self.FakeKernel32(mode=0x1F7)
         with mock.patch.object(self.mixer, "_kernel32", return_value=fake):
             self.assertTrue(self.mixer.disable_quick_edit())
         self.assertEqual(fake.set_to, (0x1F7 & ~0x40) | 0x80)
 
     @unittest.skipUnless(os.name == "nt", "Windows only")
-    def test_ohne_konsole_passiert_nichts(self):
+    def test_without_console_nothing_happens(self):
         fake = self.FakeKernel32(console=False)
         with mock.patch.object(self.mixer, "_kernel32", return_value=fake):
             self.assertFalse(self.mixer.disable_quick_edit())
         self.assertIsNone(fake.set_to)
 
-    def test_fehler_werden_geschluckt(self):
+    def test_errors_are_swallowed(self):
         with mock.patch.object(self.mixer, "_kernel32", side_effect=OSError("kaputt")):
             self.assertFalse(self.mixer.disable_quick_edit())
 
-    def test_echter_aufruf_wirft_nicht(self):
+    def test_real_call_does_not_raise(self):
         self.assertIsInstance(self.mixer.disable_quick_edit(), bool)
 
 
 class SingleInstanceLockTest(MixerTestCase):
-    def test_zweite_sperre_im_selben_prozess_scheitert(self):
+    def test_second_lock_in_same_process_fails(self):
         first = self.mixer.acquire_single_instance_lock()
         self.assertIsNotNone(first)
         try:
@@ -164,7 +164,7 @@ class SingleInstanceLockTest(MixerTestCase):
         self.assertIsNotNone(again)
         self.mixer.release_single_instance_lock(again)
 
-    def test_sperre_gilt_prozessuebergreifend_und_endet_mit_dem_prozess(self):
+    def test_lock_works_across_processes_and_ends_with_the_process(self):
         code = (
             "import importlib.util, sys, pathlib\n"
             "spec = importlib.util.spec_from_file_location('m', sys.argv[1])\n"
@@ -184,7 +184,7 @@ class SingleInstanceLockTest(MixerTestCase):
         self.assertIsNotNone(handle)
         self.mixer.release_single_instance_lock(handle)
 
-    def test_main_beendet_sich_wenn_schon_eine_instanz_laeuft(self):
+    def test_main_exits_if_an_instance_is_already_running(self):
         held = self.mixer.acquire_single_instance_lock()
         self.addCleanup(self.mixer.release_single_instance_lock, held)
         with mock.patch.object(self.mixer, "setup_logging"), \
@@ -197,7 +197,7 @@ class SingleInstanceLockTest(MixerTestCase):
 
 
 class WaitForDirsTest(MixerTestCase):
-    def test_wartet_bis_ordner_erreichbar_sind(self):
+    def test_waits_until_folders_are_reachable(self):
         errors = [OSError("network drive not connected"), OSError("network drive not connected"), None]
         with mock.patch.object(self.mixer, "ensure_dirs", side_effect=errors) as ensure, \
              self.assertLogs("overlay_mixer", "INFO") as logs:
@@ -208,7 +208,7 @@ class WaitForDirsTest(MixerTestCase):
         self.assertIn("network drive not connected", warnings[0].getMessage())
         self.assertIn("Folders reachable", logs.output[-1])
 
-    def test_ohne_wartezeit_kein_logeintrag(self):
+    def test_no_log_entry_without_waiting(self):
         with mock.patch.object(self.mixer, "ensure_dirs"), mock.patch.object(self.mixer.logger, "info") as info:
             self.mixer.wait_for_dirs(retry_seconds=0.01)
         info.assert_not_called()
@@ -221,18 +221,18 @@ class OverlayQueueTest(MixerTestCase):
         self.file = self.eingang / "Stadtfest.mp3"
         self.file.write_bytes(b"x" * 10)
 
-    def test_doppelte_eintraege_werden_verworfen(self):
+    def test_duplicate_entries_are_dropped(self):
         self.assertTrue(self.queue.put(self.file))
         self.assertFalse(self.queue.put(self.file))
         self.assertFalse(self.queue.put(Path(str(self.file))))
         self.assertEqual(self.queue.qsize(), 1)
 
     @unittest.skipUnless(os.name == "nt", "paths are case-insensitive on Windows only")
-    def test_gross_kleinschreibung_ist_derselbe_pfad(self):
+    def test_different_case_is_the_same_path(self):
         self.queue.put(self.file)
         self.assertFalse(self.queue.put(self.eingang / "STADTFEST.MP3"))
 
-    def test_nach_verarbeitung_wieder_einreihbar(self):
+    def test_can_be_queued_again_after_processing(self):
         self.queue.put(self.file)
         self.queue.get()
         self.file.unlink()
@@ -240,7 +240,7 @@ class OverlayQueueTest(MixerTestCase):
         self.file.write_bytes(b"neu")
         self.assertTrue(self.queue.put(self.file))
 
-    def test_nach_erfolg_liegengebliebene_datei_nicht_erneut(self):
+    def test_file_left_after_success_is_not_queued_again(self):
         self.queue.put(self.file)
         self.queue.get()
         self.assertTrue(self.queue.finish(self.file, success=True))
@@ -248,7 +248,7 @@ class OverlayQueueTest(MixerTestCase):
         self.file.write_bytes(b"geaenderter Inhalt")  # new file with the same name
         self.assertTrue(self.queue.put(self.file))
 
-    def test_nach_fehler_liegengebliebene_datei_erst_nach_wartezeit(self):
+    def test_file_left_after_error_only_after_retry_delay(self):
         self.queue.put(self.file)
         self.queue.get()
         self.assertTrue(self.queue.finish(self.file, success=False))
@@ -270,7 +270,7 @@ class WorkerTest(MixerTestCase):
         t.join(timeout=3)
         return finished, alive
 
-    def test_worker_ueberlebt_unerwartete_fehler(self):
+    def test_worker_survives_unexpected_errors(self):
         with mock.patch.object(self.mixer, "process_overlay", side_effect=[RuntimeError("Bug"), True]) as process, \
              self.assertLogs("overlay_mixer", "ERROR") as logs:
             finished, alive = self.run_worker(Queue(), [Path("a.mp3"), Path("b.mp3")])
@@ -278,7 +278,7 @@ class WorkerTest(MixerTestCase):
         self.assertEqual(process.call_count, 2)
         self.assertIn("Unexpected error while processing a.mp3", logs.output[0])
 
-    def test_worker_ueberlebt_fehler_in_der_fehlerbehandlung(self):
+    def test_worker_survives_errors_in_error_handling(self):
         """In v1.4.0 this ended the worker – the mixer kept running but no longer processed anything."""
         files = []
         for name in ("a.mp3", "b.mp3"):
@@ -295,7 +295,7 @@ class WorkerTest(MixerTestCase):
         self.assertEqual(move.call_count, 2)
         self.assertIn("Could not move a.mp3 to error folder: network drive gone", "\n".join(logs.output))
 
-    def test_liegengebliebene_datei_wird_gemeldet(self):
+    def test_left_over_file_is_reported(self):
         f = self.eingang / "Stadtfest.mp3"
         f.write_bytes(b"x")
         queue = self.mixer.OverlayQueue()
@@ -312,16 +312,16 @@ class OverlayHandlerRobustnessTest(MixerTestCase):
         self.queue = self.mixer.OverlayQueue()
         self.handler = self.mixer.OverlayHandler(self.queue)
 
-    def test_umbenannte_datei_im_eingang_wird_erkannt(self):
+    def test_renamed_file_in_input_is_detected(self):
         self.handler.dispatch(FileMovedEvent(str(self.eingang / "upload.tmp"), str(self.eingang / "Stadtfest.mp3")))
         self.assertEqual(list(self.queue.queue), [self.eingang / "Stadtfest.mp3"])
 
-    def test_verschieben_aus_dem_eingang_wird_ignoriert(self):
+    def test_moving_out_of_input_is_ignored(self):
         self.handler.dispatch(FileMovedEvent(str(self.eingang / "a.mp3"), str(self.root / "anderswo" / "a.mp3")))
         self.handler.dispatch(FileMovedEvent(str(self.eingang / "a.mp3"), str(self.eingang / "a.txt")))
         self.assertEqual(list(self.queue.queue), [])
 
-    def test_doppelte_ereignisse_landen_nur_einmal_in_der_queue(self):
+    def test_duplicate_events_are_queued_only_once(self):
         path = str(self.eingang / "Stadtfest.mp3")
         self.handler.dispatch(FileCreatedEvent(path))
         self.handler.dispatch(FileModifiedEvent(path))
@@ -329,7 +329,7 @@ class OverlayHandlerRobustnessTest(MixerTestCase):
         self.handler.dispatch(FileMovedEvent(str(self.eingang / "x.tmp"), path))
         self.assertEqual(len(self.queue.queue), 1)
 
-    def test_fehler_im_handler_beendet_die_ueberwachung_nicht(self):
+    def test_handler_error_does_not_stop_watching(self):
         with mock.patch.object(self.queue, "put", side_effect=RuntimeError("kaputt")), \
              self.assertLogs("overlay_mixer", "ERROR") as logs:
             self.handler.dispatch(FileCreatedEvent(str(self.eingang / "a.mp3")))
@@ -350,7 +350,7 @@ class ProcessOverlayRobustnessTest(MixerTestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
-    def test_erfolg_gibt_true_zurueck(self):
+    def test_success_returns_true(self):
         def fake_mix(atmo, overlay, out_path, title, *extra):
             out_path.write_bytes(b"mp3")
 
@@ -359,14 +359,14 @@ class ProcessOverlayRobustnessTest(MixerTestCase):
             self.assertTrue(self.mixer.process_overlay(self.overlay))
         self.assertEqual(self.names(self.fertig), ["VAH Stadtfest.mp3"])
 
-    def test_verschwundene_datei_wird_sofort_uebersprungen(self):
+    def test_vanished_file_is_skipped_immediately(self):
         self.overlay.unlink()
         self.mixer.wait_for_stable_file.side_effect = AssertionError("must not wait")
         with self.assertLogs("overlay_mixer", "INFO") as logs:
             self.assertFalse(self.mixer.process_overlay(self.overlay))
         self.assertEqual(logs.output, ["INFO:overlay_mixer:Skipped (no longer in input folder): Stadtfest.wav"])
 
-    def test_ffmpeg_fehler_entfernt_halbe_ausgabedatei(self):
+    def test_ffmpeg_error_removes_partial_output_file(self):
         def broken_mix(atmo, overlay, out_path, title, *extra):
             out_path.write_bytes(b"halb")
             raise RuntimeError("ffmpeg failed: Test")
@@ -378,7 +378,7 @@ class ProcessOverlayRobustnessTest(MixerTestCase):
         self.assertEqual(self.names(self.fehler), ["Stadtfest.wav"])
         self.assertIn("Removed incomplete output file: VAH Stadtfest.mp3", "\n".join(logs.output))
 
-    def test_fehler_beim_verschieben_nach_fehler_wird_protokolliert(self):
+    def test_error_moving_to_error_folder_is_logged(self):
         with mock.patch.object(self.mixer, "mix_with_ffmpeg", side_effect=RuntimeError("ffmpeg kaputt")), \
              mock.patch.object(self.mixer, "move_to_error", side_effect=PermissionError("gesperrt")), \
              self.assertLogs("overlay_mixer", "ERROR") as logs:
@@ -398,7 +398,7 @@ class MixerServiceTest(MixerTestCase):
         self.service = self.mixer.MixerService()
         self.addCleanup(self.service.stop)
 
-    def test_start_und_stop(self):
+    def test_start_and_stop(self):
         self.service.start()
         self.assertTrue(self.mixer._observer_healthy(self.service.observer))
         self.assertTrue(self.service.worker.is_alive())
@@ -406,7 +406,7 @@ class MixerServiceTest(MixerTestCase):
         self.assertIsNone(self.service.observer)
         self.assertFalse(self.service.worker.is_alive())
 
-    def test_toter_worker_wird_neu_gestartet(self):
+    def test_dead_worker_is_restarted(self):
         self.service.start()
         dead = threading.Thread(target=lambda: None)
         dead.start()
@@ -417,7 +417,7 @@ class MixerServiceTest(MixerTestCase):
         self.assertIn("Worker thread had stopped", logs.output[0])
         self.assertTrue(self.service.worker.is_alive())
 
-    def test_beendete_ueberwachung_wird_neu_gestartet(self):
+    def test_stopped_observer_is_restarted(self):
         self.service.start()
         self.service.observer.stop()
         self.service.observer.join()
@@ -426,11 +426,11 @@ class MixerServiceTest(MixerTestCase):
         self.assertIn("Folder watcher had stopped", logs.output[0])
         self.assertTrue(self.mixer._observer_healthy(self.service.observer))
 
-    def test_toter_emitter_wird_erkannt(self):
+    def test_dead_emitter_is_detected(self):
         observer = mock.Mock(is_alive=mock.Mock(return_value=True), emitters={FakeDeadEmitter()})
         self.assertFalse(self.mixer._observer_healthy(observer))
 
-    def test_fehlender_eingang_wird_nur_selten_protokolliert(self):
+    def test_missing_input_is_logged_only_rarely(self):
         with mock.patch.object(self.mixer, "SCHNEIDEN_DIR", self.root / "does not exist"), \
              self.assertLogs("overlay_mixer", "ERROR") as logs:
             for _ in range(3):
@@ -438,7 +438,7 @@ class MixerServiceTest(MixerTestCase):
         self.assertEqual(len(logs.output), 1)
         self.assertIsNone(self.service.observer)
 
-    def test_rescan_findet_nicht_gemeldete_dateien(self):
+    def test_rescan_finds_unreported_files(self):
         (self.eingang / "Stadtfest.mp3").write_bytes(b"x")
         with self.assertLogs("overlay_mixer", "WARNING") as logs:
             self.assertEqual(self.service.rescan(), 1)
@@ -447,7 +447,7 @@ class MixerServiceTest(MixerTestCase):
             self.assertEqual(self.service.rescan(), 0)  # already in the queue
         warning.assert_not_called()
 
-    def test_tick_loest_rescan_und_heartbeat_aus(self):
+    def test_tick_triggers_rescan_and_heartbeat(self):
         with mock.patch.object(self.service, "ensure_worker"), \
              mock.patch.object(self.service, "ensure_observer"), \
              mock.patch.object(self.service, "rescan") as rescan, \
@@ -461,7 +461,7 @@ class MixerServiceTest(MixerTestCase):
         self.assertIn("Heartbeat: running", logs.output[-1])
 
     @requires_ffmpeg
-    def test_ende_zu_ende_mit_echter_ordnerueberwachung(self):
+    def test_end_to_end_with_real_folder_watching(self):
         """A new file and a renamed file are processed via folder watching – each exactly once."""
         self.install_test_atmos()
         original = self.mixer.wait_for_stable_file
@@ -483,7 +483,7 @@ class MixerServiceTest(MixerTestCase):
 
 class MainTest(MixerTestCase):
     @requires_ffmpeg
-    def test_main_start_verarbeitung_und_sauberes_ende(self):
+    def test_main_startup_processing_and_clean_exit(self):
         """main() end to end: startup, processing a file from the input folder, Ctrl+C, cleanup."""
         import _thread
 

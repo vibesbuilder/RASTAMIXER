@@ -9,26 +9,26 @@ from helpers import (MixerTestCase, duration, explorer_properties, format_tags, 
 
 
 @requires_ffmpeg
-class DauerTest(MixerTestCase):
-    def test_dauer_wird_ermittelt(self):
+class DurationTest(MixerTestCase):
+    def test_duration_is_measured(self):
         for ext in (".wav", ".mp3"):
             with self.subTest(ext=ext):
                 f = make_tone(self.eingang / f"ton{ext}", 3)
                 self.assertAlmostEqual(self.mixer.get_duration_seconds(f), 3.0, delta=0.05)
 
-    def test_kaputte_datei(self):
+    def test_broken_file(self):
         f = self.eingang / "kaputt.mp3"
         f.write_bytes(b"das ist kein audio" * 50)
         with self.assertRaisesRegex(RuntimeError, "ffprobe failed"):
             self.mixer.get_duration_seconds(f)
 
-    def test_fehlende_datei(self):
+    def test_missing_file(self):
         with self.assertRaisesRegex(RuntimeError, "ffprobe failed"):
             self.mixer.get_duration_seconds(self.eingang / "fehlt.mp3")
 
 
 @requires_ffmpeg
-class MischungTest(MixerTestCase):
+class MixTest(MixerTestCase):
     """Silent atmo (20 s) + tone overlay (8 s): start time and level are measurable."""
 
     ATMO_SECONDS = 20
@@ -52,28 +52,28 @@ class MischungTest(MixerTestCase):
         self.assertAlmostEqual(e1, 5.0, delta=0.05, msg="overlay does not start after 5 s")
         self.assertAlmostEqual(s2, 5.0 + overlay_seconds, delta=0.05)
 
-    def test_overlay_setzt_nach_genau_5_sekunden_ein(self):
+    def test_overlay_starts_after_exactly_5_seconds(self):
         self.assertOverlayAt5Seconds(self.mix(), self.OVERLAY_SECONDS)
 
-    def test_ausgabe_ist_so_lang_wie_die_atmo(self):
+    def test_output_is_as_long_as_the_atmo(self):
         self.assertAlmostEqual(duration(self.mix()), self.ATMO_SECONDS, delta=0.05)
 
-    def test_ausgabe_ist_mp3_mit_320_kbit_ohne_weitere_spuren(self):
+    def test_output_is_mp3_320_kbit_without_other_streams(self):
         streams = probe(self.mix())["streams"]
         self.assertEqual(len(streams), 1)
         self.assertEqual(streams[0]["codec_type"], "audio")
         self.assertEqual(streams[0]["codec_name"], "mp3")
         self.assertEqual(int(streams[0]["bit_rate"]), 320000)
 
-    def test_title_metadaten(self):
+    def test_title_metadata(self):
         self.assertEqual(title_tag(self.mix(title="VAH 20261017 Stadtfest (1)")), "VAH 20261017 Stadtfest (1)")
 
-    def test_ohne_zusatz_tags_nur_title_und_encoder(self):
+    def test_without_extra_tags_only_title_and_encoder(self):
         version, frames = id3_frames(self.mix())
         self.assertEqual(version, 4)
         self.assertEqual([f[0] for f in frames], ["TIT2", "TSSE"])
 
-    def test_zusatz_tags_werden_als_txxx_frames_geschrieben(self):
+    def test_extra_tags_are_written_as_txxx_frames(self):
         out = self.fertig / "VAH Test.mp3"
         self.mixer.mix_with_ffmpeg(self.atmo_file, self.overlay, out, "VAH Test",
                                    {"Enable Date": "2026-11-08", "Expiry Date": "2026-11-23"})
@@ -84,33 +84,33 @@ class MischungTest(MixerTestCase):
         self.assertIn(("TIT2", "VAH Test"), frames)
         self.assertOverlayAt5Seconds(out, self.OVERLAY_SECONDS)  # mix unchanged
 
-    def test_overlay_wird_von_amix_um_6_db_abgesenkt(self):
+    def test_amix_lowers_the_overlay_by_6_db(self):
         self.assertAlmostEqual(max_volume_db(self.mix()), max_volume_db(self.overlay) - 6.0, delta=1.0)
 
-    def test_zielordner_wird_angelegt(self):
+    def test_output_folder_is_created(self):
         out = self.mix(out=self.fertig / "neu" / "VAH Test.mp3")
         self.assertTrue(out.is_file())
 
-    def test_ffmpeg_fehler_wird_gemeldet(self):
+    def test_ffmpeg_error_is_reported(self):
         broken = self.eingang / "kaputt.wav"
         broken.write_bytes(b"kein audio" * 100)
         with self.assertRaisesRegex(RuntimeError, "ffmpeg failed"):
             self.mix(overlay=broken)
 
-    def test_alle_erlaubten_formate(self):
+    def test_all_allowed_formats(self):
         for ext in sorted(self.mixer.ALLOWED_EXTS):
             with self.subTest(ext=ext):
                 overlay = make_tone(self.eingang / f"overlay{ext}", 4)
                 out = self.mix(overlay=overlay, out=self.fertig / f"VAH overlay{ext}.mp3")
                 self.assertOverlayAt5Seconds(out, 4)
 
-    def test_mp4_mit_videospur_liefert_nur_audio(self):
+    def test_mp4_with_video_stream_gives_audio_only(self):
         overlay = make_video_with_audio(self.eingang / "Handyvideo.mp4", 4)
         out = self.mix(overlay=overlay)
         self.assertOverlayAt5Seconds(out, 4)
         self.assertEqual([s["codec_type"] for s in probe(out)["streams"]], ["audio"])
 
-    def test_whatsapp_sprachnachricht_mono_opus_48khz(self):
+    def test_whatsapp_voice_message_mono_opus_48khz(self):
         overlay = make_tone(self.eingang / "WhatsApp Audio.ogg", 4, channels=1, sample_rate=48000, codec="libopus")
         out = self.mix(overlay=overlay)
         self.assertOverlayAt5Seconds(out, 4)
@@ -118,7 +118,7 @@ class MischungTest(MixerTestCase):
         self.assertEqual(int(stream["channels"]), 2)
         self.assertEqual(int(stream["sample_rate"]), 44100)
 
-    def test_album_und_genre_als_standardfelder(self):
+    def test_album_and_genre_as_standard_frames(self):
         """Basis for ID3_TEXT_FIELD (since v1.6.0): FFmpeg writes album -> TALB, genre -> TCON."""
         for key, frame_id in (("Album", "TALB"), ("Genre", "TCON")):
             with self.subTest(key=key):
@@ -126,7 +126,7 @@ class MischungTest(MixerTestCase):
                 self.mixer.mix_with_ffmpeg(self.atmo_file, self.overlay, out, "VAH Test", {key: "Veranstaltungshinweis"})
                 self.assertIn((frame_id, "Veranstaltungshinweis"), id3_frames(out)[1])
 
-    def test_tmed_als_frame_id(self):
+    def test_tmed_as_frame_id(self):
         """Basis for ID3_MEDIA_TYPE (since v1.8.0): the key "TMED" (upper case) becomes the TMED frame directly,
         whereas "tmed" (lower case) becomes a TXXX field."""
         for key, expected in (("TMED", ("TMED", "News")), ("tmed", ("TXXX", ("tmed", "News")))):
@@ -137,42 +137,42 @@ class MischungTest(MixerTestCase):
 
 
 @requires_ffmpeg
-class LautheitMessungTest(MixerTestCase):
+class LoudnessMeasurementTest(MixerTestCase):
     """measure_loudness() (since v1.10.0): EBU R128 loudness and true peak via FFmpeg loudnorm."""
 
-    def test_testton(self):
+    def test_test_tone(self):
         value, peak = self.mixer.measure_loudness(make_tone(self.eingang / "ton.wav", 5))
         self.assertAlmostEqual(value, -21.35, delta=0.3)
         self.assertLess(peak, -15)
 
-    def test_leiser_ton_und_vorfilter(self):
+    def test_quiet_tone_and_pre_filter(self):
         tone = make_tone(self.eingang / "leise.wav", 5, volume_db=-10)
         self.assertAlmostEqual(self.mixer.measure_loudness(tone)[0], -31.35, delta=0.3)
         self.assertAlmostEqual(self.mixer.measure_loudness(tone, "volume=6dB")[0], -25.35, delta=0.3)
 
-    def test_spitze_wird_erkannt(self):
+    def test_peak_is_detected(self):
         value, peak = self.mixer.measure_loudness(make_tone_with_spike(self.eingang / "plopp.wav", 6))
         self.assertAlmostEqual(peak, -3.0, delta=0.5)
         self.assertLess(value, -26)
 
-    def test_mono_opus_und_mp4_mit_video(self):
+    def test_mono_opus_and_mp4_with_video(self):
         for overlay in (make_tone(self.eingang / "WhatsApp.ogg", 4, channels=1, sample_rate=48000, codec="libopus"),
                         make_video_with_audio(self.eingang / "Handyvideo.mp4", 4)):
             with self.subTest(overlay=overlay.name):
                 value, _ = self.mixer.measure_loudness(overlay)
                 self.assertTrue(-40 < value < -10, value)
 
-    def test_stille_liefert_minus_unendlich(self):
+    def test_silence_gives_minus_infinity(self):
         value, _ = self.mixer.measure_loudness(make_silence(self.eingang / "still.wav", 3))
         self.assertEqual(value, float("-inf"))
 
-    def test_kaputte_datei(self):
+    def test_broken_file(self):
         broken = self.eingang / "kaputt.mp3"
         broken.write_bytes(b"kein audio" * 100)
         with self.assertRaisesRegex(RuntimeError, "Loudness measurement failed"):
             self.mixer.measure_loudness(broken)
 
-    def test_mischung_mit_filter_fuer_die_sprachspur(self):
+    def test_mix_with_filter_for_the_voice_track(self):
         """The filter only affects the voice track, before the 5 s delay; the overlay still starts at 5 s."""
         atmo = make_silence(self.atmo / "atmo.mp3", 20)
         overlay = make_tone(self.eingang / "overlay.wav", 8)
@@ -188,7 +188,7 @@ class LautheitMessungTest(MixerTestCase):
 
 
 @requires_ffmpeg
-class Id3KommentarTest(MixerTestCase):
+class Id3CommentTest(MixerTestCase):
     """
     write_id3_comment() (since v1.6.0): FFmpeg writes "comment" only as TXXX, so the
     mixer inserts a real comment frame (COMM) into the ID3v2.4 tag itself.
@@ -205,21 +205,21 @@ class Id3KommentarTest(MixerTestCase):
         size = (data[6] << 21) | (data[7] << 14) | (data[8] << 7) | data[9]
         return data[:10 + size], data[10 + size:]
 
-    def test_kommentar_wird_als_comm_frame_eingefuegt(self):
+    def test_comment_is_inserted_as_comm_frame(self):
         self.mixer.write_id3_comment(self.out, "Veranstaltungshinweis")
         version, frames = id3_frames(self.out)
         self.assertEqual(version, 4)
         self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweis")), frames)
         self.assertNotIn("comment", [f[1][0].lower() for f in frames if f[0] == "TXXX"])
 
-    def test_player_lesen_den_kommentar(self):
+    def test_players_read_the_comment(self):
         self.mixer.write_id3_comment(self.out, "Veranstaltungshinweis")
         tags = format_tags(self.out)
         self.assertEqual(tags.get("comment"), "Veranstaltungshinweis")
         self.assertEqual(tags.get("title"), "VAH Test")
         self.assertEqual(tags.get("enable date"), "2026-11-08")
 
-    def test_audio_und_uebrige_tags_bleiben_unveraendert(self):
+    def test_audio_and_other_tags_stay_unchanged(self):
         before = self.out.read_bytes()
         frames_before = id3_frames(self.out)[1]
         self.mixer.write_id3_comment(self.out, "Veranstaltungshinweis")
@@ -228,7 +228,7 @@ class Id3KommentarTest(MixerTestCase):
         self.assertEqual([f for f in id3_frames(self.out)[1] if f[0] != "COMM"], frames_before)
         self.assertAlmostEqual(duration(self.out), 10.0, delta=0.05)
 
-    def test_umlaute_und_sonderzeichen(self):
+    def test_umlauts_and_special_characters(self):
         text = "Veranstaltungshinweis – Österreich & Straße"
         self.mixer.write_id3_comment(self.out, text)
         self.assertIn(("COMM", ("deu", "", text)), id3_frames(self.out)[1])
@@ -239,7 +239,7 @@ class Id3KommentarTest(MixerTestCase):
         data = path.read_bytes()
         return data[data.find(b"COMM") + 10]
 
-    def test_kodierung_latin1_sonst_utf16_nie_utf8(self):
+    def test_encoding_latin1_else_utf16_never_utf8(self):
         """Windows Explorer does not display UTF-8 comments (encoding 3) – but it does display Latin-1 (0) and UTF-16 (1)."""
         other = self.fertig / "VAH Test2.mp3"
         other.write_bytes(self.out.read_bytes())
@@ -250,7 +250,7 @@ class Id3KommentarTest(MixerTestCase):
         self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweis – €")), id3_frames(other)[1])
 
     @unittest.skipUnless(os.name == "nt", "Windows only")
-    def test_windows_explorer_zeigt_kommentar_und_album(self):
+    def test_windows_explorer_shows_comment_and_album(self):
         self.mixer.write_id3_comment(self.out, "Veranstaltungshinweis – Österreich")
         album = self.fertig / "VAH Album.mp3"
         self.mixer.mix_with_ffmpeg(make_silence(self.atmo / "atmo2.mp3", 10), make_tone(self.eingang / "o2.wav", 3),
@@ -259,11 +259,11 @@ class Id3KommentarTest(MixerTestCase):
                                              ["System.Comment", "System.Music.AlbumTitle"]),
                          [["Veranstaltungshinweis – Österreich", ""], ["", "Veranstaltungshinweis"]])
 
-    def test_keine_temporaere_datei_bleibt_liegen(self):
+    def test_no_temporary_file_is_left_behind(self):
         self.mixer.write_id3_comment(self.out, "Veranstaltungshinweis")
         self.assertEqual(self.names(self.fertig), ["VAH Test.mp3"])
 
-    def test_datei_ohne_id3v24_tag_bleibt_unveraendert(self):
+    def test_file_without_id3v24_tag_stays_unchanged(self):
         wav = make_tone(self.fertig / "ton.wav", 1)
         before = wav.read_bytes()
         with self.assertRaises(ValueError):

@@ -23,5 +23,5 @@ Done:
 - v2.0.1: startup line "Input: ..." (-> test_robustness.MainTest)
 
 Not decided yet (so no test here): 14-day edge case of the Created rule,
-see test_timestamps.test_grenzfall_genau_14_tage_ergibt_created_heute.
+see test_timestamps.test_edge_case_exactly_14_days_gives_created_today.
 """

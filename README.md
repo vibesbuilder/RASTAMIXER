@@ -1,11 +1,14 @@
-# VAH Overlay Mixer
+# Overlay Mixer
 
 A small Windows service-style tool that turns spoken event announcements into finished
 radio spots. It watches a folder, mixes every new voice recording over a matching
 background music bed with FFmpeg, tags the MP3 for the playout software and archives
 the original.
 
-"VAH" stands for *Veranstaltungshinweis*, German for "event announcement".
+https://github.com/user-attachments/assets/b8b74019-8ea3-40d9-ade0-4deee08ef68f
+
+The default output prefix "VAH" stands for *Veranstaltungshinweis*, German for
+"event announcement".
 
 ## Features
 
