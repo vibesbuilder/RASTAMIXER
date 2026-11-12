@@ -123,7 +123,7 @@ Example:
 2026-11-09 11:07:56 [INFO] ID3 media type set: TMED=News
 2026-11-09 11:07:56 [INFO] ID3 text set: Album=Veranstaltungshinweis
 2026-11-09 11:07:56 [INFO] Archived: 20261116 Concert in the park.wav -> 20261116 Concert in the park.wav
-2026-11-09 11:07:56 [INFO] SUCCESS: VAH 20261116 Concert in the park.mp3 created | Overlay=46.89s | Atmo=63.13s | LeadIn=5s | Buffer=2s | Version=2.0.1
+2026-11-09 11:07:56 [INFO] SUCCESS: VAH 20261116 Concert in the park.mp3 created | Overlay=46.89s | Atmo=63.13s | LeadIn=5s | Buffer=2s | Version=2.0.2
 ```
 
 ## Tests

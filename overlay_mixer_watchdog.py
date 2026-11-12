@@ -25,7 +25,7 @@ from watchdog.events import FileSystemEventHandler
 # -------------------------
 # VERSION
 # -------------------------
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 
 # -------------------------
 # CONFIGURATION (built-in defaults)

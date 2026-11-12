@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Shared helpers for the VAH Overlay Mixer tests.
+Shared helpers for the Overlay Mixer tests.
 
 load_mixer() loads the mixer script without opening the production log
 file or creating any production folders on import. MixerTestCase redirects

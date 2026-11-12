@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.2
+- The project is now called "Overlay Mixer": console window title of `start_overlay_mixer.bat`,
+  README and example configuration.
+- Test methods and test classes have English names.
+
 ## 2.0.1
 - Startup log line `Input:` has its space again.
 
