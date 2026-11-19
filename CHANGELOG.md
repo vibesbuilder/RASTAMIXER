@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0
+- The atmo keeps a constant level over the whole file. Up to 2.0.2, `amix` raised the atmo by
+  6 dB as soon as the voice track had ended (automatic normalization); now both tracks are mixed
+  with fixed weights (−6 dB each). Lead-in and voice part sound exactly as before.
+- Default ID3 text (`[tags] text`) is now "Veranstaltungshinweise".
+
 ## 2.0.2
 - The project is now called "Overlay Mixer": console window title of `start_overlay_mixer.bat`,
   README and example configuration.

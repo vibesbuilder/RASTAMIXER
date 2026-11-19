@@ -94,7 +94,7 @@ class ProcessOverlayTest(MixerTestCase):
     def frames(self, path):
         return id3_frames(path)[1]
 
-    def process_with(self, field, text="Veranstaltungshinweis", name="Stadtfest.wav", media_type=None):
+    def process_with(self, field, text="Veranstaltungshinweise", name="Stadtfest.wav", media_type=None):
         if media_type is None:
             media_type = self.mixer.ID3_MEDIA_TYPE
         with mock.patch.object(self.mixer, "ID3_TEXT_FIELD", field), mock.patch.object(self.mixer, "ID3_TEXT", text), \
@@ -105,29 +105,29 @@ class ProcessOverlayTest(MixerTestCase):
     def test_album_is_set_without_date(self):
         log = self.process(make_tone(self.eingang / "Stadtfest.wav", 5))
         out = self.fertig / "VAH Stadtfest.mp3"
-        self.assertIn(("TALB", "Veranstaltungshinweis"), self.frames(out))
-        self.assertEqual(format_tags(out).get("album"), "Veranstaltungshinweis")
-        self.assertIn("ID3 text set: Album=Veranstaltungshinweis", log)
+        self.assertIn(("TALB", "Veranstaltungshinweise"), self.frames(out))
+        self.assertEqual(format_tags(out).get("album"), "Veranstaltungshinweise")
+        self.assertIn("ID3 text set: Album=Veranstaltungshinweise", log)
 
     def test_album_is_set_with_date_in_addition_to_the_date_tags(self):
         event = date.today() + timedelta(days=20)
         log = self.process(make_tone(self.eingang / f"{event:%Y%m%d} Fest.wav", 5))
         out = self.fertig / f"VAH {event:%Y%m%d} Fest.mp3"
         frames = self.frames(out)
-        self.assertIn(("TALB", "Veranstaltungshinweis"), frames)
+        self.assertIn(("TALB", "Veranstaltungshinweise"), frames)
         self.assertIn(("TIT2", f"VAH {event:%Y%m%d} Fest"), frames)
         self.assertEqual(self.txxx(out), {"Enable Date": f"{event - timedelta(days=14):%Y-%m-%d}",
                                           "Expiry Date": f"{event + timedelta(days=1):%Y-%m-%d}"})
         self.assertIn("ID3 tags set: Enable Date=", log)
-        self.assertIn("ID3 text set: Album=Veranstaltungshinweis", log)
+        self.assertIn("ID3 text set: Album=Veranstaltungshinweise", log)
 
     def test_genre(self):
         out, log = self.process_with("Genre")
         frame_ids = [f[0] for f in self.frames(out)]
-        self.assertIn(("TCON", "Veranstaltungshinweis"), self.frames(out))
+        self.assertIn(("TCON", "Veranstaltungshinweise"), self.frames(out))
         self.assertNotIn("TALB", frame_ids)
         self.assertIn(("TMED", "News"), self.frames(out))
-        self.assertIn("ID3 text set: Genre=Veranstaltungshinweis", log)
+        self.assertIn("ID3 text set: Genre=Veranstaltungshinweise", log)
 
     def test_tmed_as_text_field_does_not_overwrite_the_media_type(self):
         out, log = self.process_with("TMED")
@@ -138,16 +138,16 @@ class ProcessOverlayTest(MixerTestCase):
 
     def test_comment_becomes_a_real_comment_frame(self):
         out, log = self.process_with("Comment")
-        self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweis")), self.frames(out))
+        self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweise")), self.frames(out))
         self.assertEqual(self.txxx(out), {})
-        self.assertEqual(format_tags(out).get("comment"), "Veranstaltungshinweis")
-        self.assertIn("ID3 text set: Comment=Veranstaltungshinweis", log)
+        self.assertEqual(format_tags(out).get("comment"), "Veranstaltungshinweise")
+        self.assertIn("ID3 text set: Comment=Veranstaltungshinweise", log)
 
     def test_comment_with_date_keeps_correct_timestamps(self):
         """The comment is inserted before Last Modified/Created are set."""
         event = date.today() + timedelta(days=20)
         out, _ = self.process_with("Comment", name=f"{event:%Y%m%d} Fest.wav")
-        self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweis")), self.frames(out))
+        self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweise")), self.frames(out))
         self.assertEqual(datetime.fromtimestamp(out.stat().st_mtime).date(), event)
         if os.name == "nt":
             self.assertEqual(datetime.fromtimestamp(out.stat().st_ctime).date(), event - timedelta(days=14))
@@ -155,8 +155,8 @@ class ProcessOverlayTest(MixerTestCase):
 
     def test_custom_frame_name_becomes_txxx(self):
         out, log = self.process_with("Kategorie")
-        self.assertEqual(self.txxx(out), {"Kategorie": "Veranstaltungshinweis"})
-        self.assertIn("ID3 text set: Kategorie=Veranstaltungshinweis", log)
+        self.assertEqual(self.txxx(out), {"Kategorie": "Veranstaltungshinweise"})
+        self.assertIn("ID3 text set: Kategorie=Veranstaltungshinweise", log)
 
     def test_empty_text_writes_nothing(self):
         out, log = self.process_with("Album", text="")
@@ -177,7 +177,7 @@ class ProcessOverlayTest(MixerTestCase):
         frames = self.frames(out)
         self.assertEqual([f for f in frames if f[0] == "TMED"], [("TMED", "News")])
         self.assertNotIn("TCON", [f[0] for f in frames])
-        self.assertIn(("TALB", "Veranstaltungshinweis"), frames)
+        self.assertIn(("TALB", "Veranstaltungshinweise"), frames)
         self.assertEqual(format_tags(out).get("tmed"), "News")
         self.assertEqual(self.txxx(out), {})
         self.assertIn("ID3 media type set: TMED=News", log)
@@ -188,7 +188,7 @@ class ProcessOverlayTest(MixerTestCase):
         out = self.fertig / f"VAH {event:%Y%m%d} Fest.mp3"
         frames = self.frames(out)
         self.assertIn(("TMED", "News"), frames)
-        self.assertIn(("TALB", "Veranstaltungshinweis"), frames)
+        self.assertIn(("TALB", "Veranstaltungshinweise"), frames)
         self.assertIn(("TIT2", f"VAH {event:%Y%m%d} Fest"), frames)
         self.assertEqual(self.txxx(out), {"Enable Date": f"{event - timedelta(days=14):%Y-%m-%d}",
                                           "Expiry Date": f"{event + timedelta(days=1):%Y-%m-%d}"})
@@ -203,14 +203,14 @@ class ProcessOverlayTest(MixerTestCase):
     def test_empty_media_type_writes_nothing(self):
         out, log = self.process_with("Album", media_type="")
         self.assertNotIn("TMED", [f[0] for f in self.frames(out)])
-        self.assertIn(("TALB", "Veranstaltungshinweis"), self.frames(out))
+        self.assertIn(("TALB", "Veranstaltungshinweise"), self.frames(out))
         self.assertNotIn("ID3 media type set", log)
 
     def test_media_type_together_with_comment(self):
         out, _ = self.process_with("Comment")
         frames = self.frames(out)
         self.assertIn(("TMED", "News"), frames)
-        self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweis")), frames)
+        self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweise")), frames)
 
     @unittest.skipUnless(os.name == "nt", "Windows only")
     def test_windows_explorer_shows_album_and_no_genre(self):
@@ -218,7 +218,7 @@ class ProcessOverlayTest(MixerTestCase):
         self.process(make_tone(self.eingang / "Stadtfest.wav", 5))
         self.assertEqual(explorer_properties(self.fertig, ["VAH Stadtfest.mp3"],
                                              ["System.Music.Genre", "System.Music.AlbumTitle"]),
-                         [["", "Veranstaltungshinweis"]])
+                         [["", "Veranstaltungshinweise"]])
 
     def test_reserved_frame_name_does_not_overwrite_the_title(self):
         out, log = self.process_with("title")

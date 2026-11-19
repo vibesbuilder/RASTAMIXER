@@ -20,6 +20,7 @@ The default output prefix "VAH" stands for *Veranstaltungshinweis*, German for
   5 seconds; the result is as long as the atmo; output is MP3 at 320 kbit/s.
 - **Loudness** – quiet voice recordings are raised to −18 LUFS (EBU R128) with a
   high-pass filter and a peak limiter before mixing. Recordings are never lowered.
+  Only the voice track is adjusted; the atmo keeps a constant level.
 - **Scheduling tags** – if the file name contains a date (`YYYYMMDD` or `YYYY-MM-DD`),
   the ID3 TXXX tags `Enable Date` (date − 14 days) and `Expiry Date` (date + 1 day)
   are written, and the file's *Last Modified*/*Created* timestamps are set from the date.
@@ -96,7 +97,8 @@ Restart the mixer after changing the configuration.
    No suitable atmo → the file goes to the error folder.
 4. The loudness of the voice track is measured; if it is quieter than the target,
    a high-pass filter, gain and a limiter are applied to the voice track.
-5. FFmpeg mixes atmo and voice (voice delayed by 5 s, `amix`) into an MP3 with the
+5. FFmpeg mixes atmo and voice (voice delayed by 5 s, `amix` with both tracks at a
+   fixed −6 dB, so the atmo keeps the same level over the whole file) into an MP3 with the
    title, scheduling tags (if a date was found), media type and text label.
 6. If a date was found, *Last Modified* is set to that date and *Created* to 14 days
    before it (or to tomorrow if the event is less than 14 days away).
@@ -121,9 +123,9 @@ Example:
 2026-11-09 11:07:54 [INFO] Loudness: -26.2 LUFS, peak -2.8 dBTP | raised by +7.5 dB (target -18.0 LUFS, peaks limited to -2.0 dB)
 2026-11-09 11:07:56 [INFO] ID3 tags set: Enable Date=2026-11-02 | Expiry Date=2026-11-17
 2026-11-09 11:07:56 [INFO] ID3 media type set: TMED=News
-2026-11-09 11:07:56 [INFO] ID3 text set: Album=Veranstaltungshinweis
+2026-11-09 11:07:56 [INFO] ID3 text set: Album=Veranstaltungshinweise
 2026-11-09 11:07:56 [INFO] Archived: 20261116 Concert in the park.wav -> 20261116 Concert in the park.wav
-2026-11-09 11:07:56 [INFO] SUCCESS: VAH 20261116 Concert in the park.mp3 created | Overlay=46.89s | Atmo=63.13s | LeadIn=5s | Buffer=2s | Version=2.0.2
+2026-11-09 11:07:56 [INFO] SUCCESS: VAH 20261116 Concert in the park.mp3 created | Overlay=46.89s | Atmo=63.13s | LeadIn=5s | Buffer=2s | Version=2.1.0
 ```
 
 ## Tests

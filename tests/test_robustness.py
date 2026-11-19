@@ -517,7 +517,7 @@ class MainTest(MixerTestCase):
             self.assertIn(f"=== Overlay Mixer Watchdog started | version {self.mixer.VERSION} ===", text)
             self.assertIn("Files in input folder at startup: 1", text)
             self.assertIn(f"Input: {self.eingang} | Atmo: {self.atmo} | Output: {self.fertig}", text)  # since v2.0.1
-            self.assertIn("ID3 text: Album = Veranstaltungshinweis", text)  # since v1.6.0
+            self.assertIn("ID3 text: Album = Veranstaltungshinweise", text)  # since v1.6.0
             self.assertIn("ID3 media type: TMED = News", text)              # since v1.8.0
             self.assertIn("Loudness: target -18.0 LUFS | raise only", text)   # since v1.10.0
             self.assertIn("dBTP | raised by +", text)                         # test tone (-21.4 LUFS) is raised

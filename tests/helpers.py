@@ -314,9 +314,11 @@ def silences(path, noise_db=-50, min_seconds=0.5):
     return list(zip(starts, ends))
 
 
-def max_volume_db(path) -> float:
+def max_volume_db(path, start=None, length=None) -> float:
+    """Peak level (volumedetect) of the whole file or of the section start..start+length (seconds)."""
+    section = (["-ss", str(start)] if start is not None else []) + (["-t", str(length)] if length is not None else [])
     result = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-nostats", "-i", str(path), "-af", "volumedetect", "-f", "null", "-"],
+        ["ffmpeg", "-hide_banner", "-nostats", *section, "-i", str(path), "-af", "volumedetect", "-f", "null", "-"],
         capture_output=True, text=True, encoding="utf-8", errors="replace")
     match = re.search(r"max_volume: (-?[\d.]+) dB", result.stderr)
     if not match:

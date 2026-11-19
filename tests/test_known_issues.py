@@ -21,6 +21,7 @@ Done:
 - v1.11.0: English log messages (expected messages in all test files)
 - v2.0.0: configuration file (-> test_config)
 - v2.0.1: startup line "Input: ..." (-> test_robustness.MainTest)
+- v2.1.0: constant atmo level (-> test_audio.AtmoLevelTest), ID3 text "Veranstaltungshinweise"
 
 Not decided yet (so no test here): 14-day edge case of the Created rule,
 see test_timestamps.test_edge_case_exactly_14_days_gives_created_today.

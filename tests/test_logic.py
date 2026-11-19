@@ -46,7 +46,7 @@ class DefaultSettingsTest(MixerTestCase):
     def test_id3_text_settings(self):
         # since v1.6.0: tagging of every generated file
         self.assertEqual(self.mixer.ID3_TEXT_FIELD, "Album")
-        self.assertEqual(self.mixer.ID3_TEXT, "Veranstaltungshinweis")
+        self.assertEqual(self.mixer.ID3_TEXT, "Veranstaltungshinweise")
         self.assertEqual(self.mixer.ID3_COMMENT_LANGUAGE, "deu")
 
     def test_id3_media_type_setting(self):
@@ -156,7 +156,7 @@ class LoudnessFilterTest(MixerTestCase):
 class Id3TextTagTest(MixerTestCase):
     """id3_text_tag(): which field is written with which text (since v1.6.0)."""
 
-    def tag(self, field, text="Veranstaltungshinweis", media_type=None):
+    def tag(self, field, text="Veranstaltungshinweise", media_type=None):
         if media_type is None:
             media_type = self.mixer.ID3_MEDIA_TYPE
         with mock.patch.object(self.mixer, "ID3_TEXT_FIELD", field), mock.patch.object(self.mixer, "ID3_TEXT", text), \
@@ -164,22 +164,22 @@ class Id3TextTagTest(MixerTestCase):
             return self.mixer.id3_text_tag()
 
     def test_default_is_album(self):
-        self.assertEqual(self.mixer.id3_text_tag(), ("Album", "Veranstaltungshinweis"))
+        self.assertEqual(self.mixer.id3_text_tag(), ("Album", "Veranstaltungshinweise"))
 
     def test_selectable_frames(self):
         for field in ("Album", "Genre", "Comment", "Kategorie", "Mein eigenes Feld"):
             with self.subTest(field=field):
-                self.assertEqual(self.tag(field), (field, "Veranstaltungshinweis"))
+                self.assertEqual(self.tag(field), (field, "Veranstaltungshinweise"))
 
     def test_tmed_only_without_media_type(self):
         """Since v1.8.0 ID3_MEDIA_TYPE writes the TMED field; the ID3 text must then not overwrite it."""
         for field in ("TMED", "tmed", "Media Type"):
             with self.subTest(field=field):
                 self.assertIsNone(self.tag(field))
-                self.assertEqual(self.tag(field, media_type=""), (field, "Veranstaltungshinweis"))
+                self.assertEqual(self.tag(field, media_type=""), (field, "Veranstaltungshinweise"))
 
     def test_frame_name_is_stripped_of_spaces(self):
-        self.assertEqual(self.tag("  Genre "), ("Genre", "Veranstaltungshinweis"))
+        self.assertEqual(self.tag("  Genre "), ("Genre", "Veranstaltungshinweise"))
 
     def test_custom_text(self):
         self.assertEqual(self.tag("Album", "VAH – Community Radio"), ("Album", "VAH – Community Radio"))
@@ -220,32 +220,32 @@ class Id3TextStartLogTest(MixerTestCase):
         return logs.output
 
     def test_default(self):
-        self.assertEqual(self.log("Album", "Veranstaltungshinweis"),
-                         ["INFO:overlay_mixer:ID3 text: Album = Veranstaltungshinweis"])
+        self.assertEqual(self.log("Album", "Veranstaltungshinweise"),
+                         ["INFO:overlay_mixer:ID3 text: Album = Veranstaltungshinweise"])
 
     def test_comment(self):
-        self.assertEqual(self.log("Comment", "Veranstaltungshinweis"),
-                         ["INFO:overlay_mixer:ID3 text: Comment = Veranstaltungshinweis (comment frame COMM)"])
+        self.assertEqual(self.log("Comment", "Veranstaltungshinweise"),
+                         ["INFO:overlay_mixer:ID3 text: Comment = Veranstaltungshinweise (comment frame COMM)"])
 
     def test_off(self):
         self.assertEqual(self.log("Album", ""), ["INFO:overlay_mixer:ID3 text: off (no text configured)"])
 
     def test_warns_about_reserved_name(self):
-        self.assertEqual(self.log("Title", "Veranstaltungshinweis"),
+        self.assertEqual(self.log("Title", "Veranstaltungshinweise"),
                          ["WARNING:overlay_mixer:ID3 text: field name 'Title' is reserved | no text will be written"])
 
     def test_warns_about_tmed_with_media_type(self):
-        self.assertEqual(self.log("TMED", "Veranstaltungshinweis"),
+        self.assertEqual(self.log("TMED", "Veranstaltungshinweise"),
                          ["WARNING:overlay_mixer:ID3 text: field name 'TMED' is reserved "
                           "(TMED is set via ID3_MEDIA_TYPE) | no text will be written"])
 
     def test_tmed_without_media_type(self):
-        self.assertEqual(self.log("TMED", "Veranstaltungshinweis", media_type=""),
-                         ["INFO:overlay_mixer:ID3 text: TMED = Veranstaltungshinweis"])
+        self.assertEqual(self.log("TMED", "Veranstaltungshinweise", media_type=""),
+                         ["INFO:overlay_mixer:ID3 text: TMED = Veranstaltungshinweise"])
 
     def test_genre_is_free(self):
-        self.assertEqual(self.log("Genre", "Veranstaltungshinweis"),
-                         ["INFO:overlay_mixer:ID3 text: Genre = Veranstaltungshinweis"])
+        self.assertEqual(self.log("Genre", "Veranstaltungshinweise"),
+                         ["INFO:overlay_mixer:ID3 text: Genre = Veranstaltungshinweise"])
 
 
 class Id3MediaTypeTest(MixerTestCase):

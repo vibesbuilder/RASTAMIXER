@@ -55,13 +55,13 @@ class LoadConfigTest(ConfigTestCase):
             "[output]\nprefix = \"VAH \"\n"
             "[tags]\nenable_date_tag = Enable Date\nexpiry_date_tag = Expiry Date\n"
             "enable_days_before = 14\nexpiry_days_after = 1\ndate_format = %Y-%m-%d\n"
-            "media_type = News\ntext_field = Album\ntext = Veranstaltungshinweis\ncomment_language = deu\n")
+            "media_type = News\ntext_field = Album\ntext = Veranstaltungshinweise\ncomment_language = deu\n")
         self.assertEqual(values, {
             "FFMPEG_BIN": r"C:\Tools\ffmpeg.exe", "FFPROBE_BIN": "ffprobe",
             "LEADIN_SECONDS": 5, "BUFFER_SECONDS": 2.5, "BITRATE": "256k", "OUTPUT_PREFIX": "VAH ",
             "TAG_ENABLE_DATE": "Enable Date", "TAG_EXPIRY_DATE": "Expiry Date",
             "ENABLE_DAYS_BEFORE": 14, "EXPIRY_DAYS_AFTER": 1, "TAG_DATE_FORMAT": "%Y-%m-%d",
-            "ID3_MEDIA_TYPE": "News", "ID3_TEXT_FIELD": "Album", "ID3_TEXT": "Veranstaltungshinweis",
+            "ID3_MEDIA_TYPE": "News", "ID3_TEXT_FIELD": "Album", "ID3_TEXT": "Veranstaltungshinweise",
             "ID3_COMMENT_LANGUAGE": "deu"})
         self.assertIsInstance(values["LEADIN_SECONDS"], int)   # keeps the log output "LeadIn=5s"
 

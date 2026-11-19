@@ -123,8 +123,8 @@ class MixTest(MixerTestCase):
         for key, frame_id in (("Album", "TALB"), ("Genre", "TCON")):
             with self.subTest(key=key):
                 out = self.fertig / f"VAH {key}.mp3"
-                self.mixer.mix_with_ffmpeg(self.atmo_file, self.overlay, out, "VAH Test", {key: "Veranstaltungshinweis"})
-                self.assertIn((frame_id, "Veranstaltungshinweis"), id3_frames(out)[1])
+                self.mixer.mix_with_ffmpeg(self.atmo_file, self.overlay, out, "VAH Test", {key: "Veranstaltungshinweise"})
+                self.assertIn((frame_id, "Veranstaltungshinweise"), id3_frames(out)[1])
 
     def test_tmed_as_frame_id(self):
         """Basis for ID3_MEDIA_TYPE (since v1.8.0): the key "TMED" (upper case) becomes the TMED frame directly,
@@ -134,6 +134,46 @@ class MixTest(MixerTestCase):
                 out = self.fertig / f"VAH {'gross' if key.isupper() else 'klein'}.mp3"   # Windows: case-insensitive
                 self.mixer.mix_with_ffmpeg(self.atmo_file, self.overlay, out, "VAH Test", {key: "News"})
                 self.assertIn(expected, id3_frames(out)[1])
+
+
+@requires_ffmpeg
+class AtmoLevelTest(MixerTestCase):
+    """
+    Level of the atmo in the mix (since v2.1.0): amix lowers both tracks by a fixed 6 dB and the atmo
+    keeps this level over the whole file, also after the voice has ended (up to v2.0.2 it jumped back
+    to full level). Loudness adjustments only affect the voice track.
+    Atmo: 440 Hz tone (20 s); voice: 8 s, i.e. 5-13 s in the mix.
+    """
+
+    SECTIONS = (("lead-in", 1, 3), ("voice", 6, 6), ("after the voice", 14, 5))
+
+    def setUp(self):
+        super().setUp()
+        self.atmo_file = make_tone(self.atmo / "atmo.mp3", 20, frequency=440)
+        self.atmo_level = max_volume_db(self.atmo_file, 1, 3)
+
+    def mix(self, overlay, name="VAH Test.mp3", overlay_filter=None):
+        out = self.fertig / name
+        self.mixer.mix_with_ffmpeg(self.atmo_file, overlay, out, "VAH Test", None, overlay_filter)
+        return out
+
+    def test_atmo_is_lowered_by_6_db_over_the_whole_file(self):
+        out = self.mix(make_silence(self.eingang / "still.wav", 8))
+        for section, start, length in self.SECTIONS:
+            with self.subTest(section=section):
+                self.assertAlmostEqual(max_volume_db(out, start, length), self.atmo_level - 6.0, delta=0.5)
+
+    def test_raising_the_voice_does_not_change_the_atmo(self):
+        overlay = make_tone(self.eingang / "overlay.wav", 8, volume_db=-10)
+        plain = self.mix(overlay, "VAH plain.mp3")
+        raised = self.mix(overlay, "VAH raised.mp3", "highpass=f=80,volume=10.00dB,"
+                                                     "alimiter=limit=-2dB:level=disabled:attack=5:release=50:latency=1")
+        self.assertGreater(max_volume_db(raised, 6, 6), max_volume_db(plain, 6, 6) + 5)    # voice is louder
+        for section, start, length in (self.SECTIONS[0], self.SECTIONS[2]):                 # atmo alone
+            with self.subTest(section=section):
+                self.assertAlmostEqual(max_volume_db(raised, start, length), max_volume_db(plain, start, length),
+                                       delta=0.2)
+                self.assertAlmostEqual(max_volume_db(raised, start, length), self.atmo_level - 6.0, delta=0.5)
 
 
 @requires_ffmpeg
@@ -206,30 +246,30 @@ class Id3CommentTest(MixerTestCase):
         return data[:10 + size], data[10 + size:]
 
     def test_comment_is_inserted_as_comm_frame(self):
-        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweis")
+        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweise")
         version, frames = id3_frames(self.out)
         self.assertEqual(version, 4)
-        self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweis")), frames)
+        self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweise")), frames)
         self.assertNotIn("comment", [f[1][0].lower() for f in frames if f[0] == "TXXX"])
 
     def test_players_read_the_comment(self):
-        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweis")
+        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweise")
         tags = format_tags(self.out)
-        self.assertEqual(tags.get("comment"), "Veranstaltungshinweis")
+        self.assertEqual(tags.get("comment"), "Veranstaltungshinweise")
         self.assertEqual(tags.get("title"), "VAH Test")
         self.assertEqual(tags.get("enable date"), "2026-11-08")
 
     def test_audio_and_other_tags_stay_unchanged(self):
         before = self.out.read_bytes()
         frames_before = id3_frames(self.out)[1]
-        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweis")
+        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweise")
         after = self.out.read_bytes()
         self.assertEqual(self.split_tag(after)[1], self.split_tag(before)[1], "audio data changed")
         self.assertEqual([f for f in id3_frames(self.out)[1] if f[0] != "COMM"], frames_before)
         self.assertAlmostEqual(duration(self.out), 10.0, delta=0.05)
 
     def test_umlauts_and_special_characters(self):
-        text = "Veranstaltungshinweis – Österreich & Straße"
+        text = "Veranstaltungshinweise – Österreich & Straße"
         self.mixer.write_id3_comment(self.out, text)
         self.assertIn(("COMM", ("deu", "", text)), id3_frames(self.out)[1])
         self.assertEqual(format_tags(self.out).get("comment"), text)
@@ -243,31 +283,31 @@ class Id3CommentTest(MixerTestCase):
         """Windows Explorer does not display UTF-8 comments (encoding 3) – but it does display Latin-1 (0) and UTF-16 (1)."""
         other = self.fertig / "VAH Test2.mp3"
         other.write_bytes(self.out.read_bytes())
-        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweis Österreich")
+        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweise Österreich")
         self.assertEqual(self.comm_encoding(self.out), 0)
-        self.mixer.write_id3_comment(other, "Veranstaltungshinweis – €")
+        self.mixer.write_id3_comment(other, "Veranstaltungshinweise – €")
         self.assertEqual(self.comm_encoding(other), 1)
-        self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweis – €")), id3_frames(other)[1])
+        self.assertIn(("COMM", ("deu", "", "Veranstaltungshinweise – €")), id3_frames(other)[1])
 
     @unittest.skipUnless(os.name == "nt", "Windows only")
     def test_windows_explorer_shows_comment_and_album(self):
-        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweis – Österreich")
+        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweise – Österreich")
         album = self.fertig / "VAH Album.mp3"
         self.mixer.mix_with_ffmpeg(make_silence(self.atmo / "atmo2.mp3", 10), make_tone(self.eingang / "o2.wav", 3),
-                                   album, "VAH Album", {"Album": "Veranstaltungshinweis"})
+                                   album, "VAH Album", {"Album": "Veranstaltungshinweise"})
         self.assertEqual(explorer_properties(self.fertig, ["VAH Test.mp3", "VAH Album.mp3"],
                                              ["System.Comment", "System.Music.AlbumTitle"]),
-                         [["Veranstaltungshinweis – Österreich", ""], ["", "Veranstaltungshinweis"]])
+                         [["Veranstaltungshinweise – Österreich", ""], ["", "Veranstaltungshinweise"]])
 
     def test_no_temporary_file_is_left_behind(self):
-        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweis")
+        self.mixer.write_id3_comment(self.out, "Veranstaltungshinweise")
         self.assertEqual(self.names(self.fertig), ["VAH Test.mp3"])
 
     def test_file_without_id3v24_tag_stays_unchanged(self):
         wav = make_tone(self.fertig / "ton.wav", 1)
         before = wav.read_bytes()
         with self.assertRaises(ValueError):
-            self.mixer.write_id3_comment(wav, "Veranstaltungshinweis")
+            self.mixer.write_id3_comment(wav, "Veranstaltungshinweise")
         self.assertEqual(wav.read_bytes(), before)
         self.assertEqual(self.names(self.fertig), ["VAH Test.mp3", "ton.wav"])
 

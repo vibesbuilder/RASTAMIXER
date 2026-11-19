@@ -1,4 +1,4 @@
-# overlay_mixer_watchdog_v2.0.1.py
+# overlay_mixer_watchdog_v2.1.0.py
 # -*- coding: utf-8 -*-
 import configparser
 import json
@@ -25,7 +25,7 @@ from watchdog.events import FileSystemEventHandler
 # -------------------------
 # VERSION
 # -------------------------
-VERSION = "2.0.2"
+VERSION = "2.1.0"
 
 # -------------------------
 # CONFIGURATION (built-in defaults)
@@ -70,13 +70,13 @@ ID3_MEDIA_TYPE       = "News"                   # empty ("") = write nothing
 #                 Not allowed (ignored): "title", TAG_ENABLE_DATE, TAG_EXPIRY_DATE,
 #                 and while ID3_MEDIA_TYPE is set: "TMED", "Media Type".
 ID3_TEXT_FIELD       = "Album"
-ID3_TEXT             = "Veranstaltungshinweis"  # empty ("") = write nothing
+ID3_TEXT             = "Veranstaltungshinweise" # empty ("") = write nothing
 ID3_COMMENT_LANGUAGE = "deu"                    # language code (ISO 639-2), only for "Comment"
 
 # Loudness of the voice track: raise quiet overlays before mixing - raise only, never lower.
 # Procedure: measure loudness (EBU R128). If it is more than LOUDNESS_TOLERANCE_LU below the target:
 #            remove lows below LOUDNESS_HIGHPASS_HZ, amplify to the target, limit the peaks.
-#            The mix itself (atmo, 5 s lead-in, amix) stays unchanged.
+#            The atmo is not affected (fixed level in the mix, see mix_with_ffmpeg).
 LOUDNESS_TARGET_LUFS   = -18.0   # target loudness of the voice track before mixing; None = off
 LOUDNESS_TOLERANCE_LU  = 1.0     # up to this far below the target the voice track stays unchanged
 LOUDNESS_PEAK_LIMIT_DB = -2.0    # peak limit after raising (dBFS, -24 to 0)
@@ -640,7 +640,10 @@ def mix_with_ffmpeg(atmo: Path, overlay: Path, out_path: Path, title: str, extra
     delay_ms = int(LEADIN_SECONDS * 1000)
     # overlay_filter (e.g. raising the loudness) only affects the voice track, before the delay
     pre = f"{overlay_filter}," if overlay_filter else ""
-    filter_complex = f"[1]{pre}adelay={delay_ms}:all=1[ov];[0][ov]amix=inputs=2:dropout_transition=0"
+    # amix with fixed weights: atmo and voice are both lowered by 6 dB and the atmo keeps this level over
+    # the whole file (normalize=0: no automatic gain change when the voice track has ended).
+    filter_complex = (f"[1]{pre}adelay={delay_ms}:all=1[ov];"
+                      f"[0][ov]amix=inputs=2:dropout_transition=0:normalize=0:weights='0.5 0.5'")
     cmd = [
         FFMPEG_BIN, "-y", "-hide_banner", "-loglevel", "error",
         "-i", str(atmo), "-i", str(overlay),
